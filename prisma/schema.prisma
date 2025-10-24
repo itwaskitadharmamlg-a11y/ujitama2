@@ -1,0 +1,175 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  nim          String?  @unique
+  username     String?  @unique
+  name         String
+  password     String
+  role         Role     @default(STUDENT)
+  programStudi String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  examResults  ExamResult[]
+  createdExams Exam[]
+  feedbacks    Feedback[]
+  classes      ClassStudent[]
+  createdClasses Class[] @relation("ClassCreator")
+
+  @@map("users")
+}
+
+model Class {
+  id          String   @id @default(cuid())
+  name        String
+  programStudi String
+  description String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  creator     User         @relation("ClassCreator", fields: [createdBy], references: [id])
+  exams       Exam[]
+  students    ClassStudent[]
+
+  @@map("classes")
+}
+
+model ClassStudent {
+  id       String @id @default(cuid())
+  classId  String
+  studentId String
+
+  // Relations
+  class    Class @relation(fields: [classId], references: [id])
+  student  User  @relation(fields: [studentId], references: [id])
+
+  @@unique([classId, studentId])
+  @@map("class_students")
+}
+
+model Exam {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  duration    Int      // in minutes
+  startTime   DateTime
+  endTime     DateTime
+  isActive    Boolean  @default(false)
+  createdBy   String
+  classId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  creator     User          @relation(fields: [createdBy], references: [id])
+  class       Class         @relation(fields: [classId], references: [id])
+  questions   Question[]
+  results     ExamResult[]
+
+  @@map("exams")
+}
+
+model Question {
+  id          String       @id @default(cuid())
+  examId      String
+  question    String
+  type        QuestionType
+  options     String?      // JSON string for multiple choice options
+  correctAnswer String?
+  maxScore    Int          @default(1)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  exam        Exam         @relation(fields: [examId], references: [id])
+  answers     Answer[]
+
+  @@map("questions")
+}
+
+model Answer {
+  id         String @id @default(cuid())
+  questionId String
+  resultId   String
+  answer     String
+  isCorrect  Boolean?
+  score      Int?
+
+  // Relations
+  question   Question    @relation(fields: [questionId], references: [id])
+  result     ExamResult  @relation(fields: [resultId], references: [id])
+
+  @@map("answers")
+}
+
+model ExamResult {
+  id        String   @id @default(cuid())
+  examId    String
+  studentId String
+  score     Int?
+  maxScore  Int?
+  status    ExamStatus @default(NOT_STARTED)
+  startedAt DateTime?
+  finishedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  exam      Exam       @relation(fields: [examId], references: [id])
+  student   User       @relation(fields: [studentId], references: [id])
+  answers   Answer[]
+  feedbacks Feedback[]
+
+  @@unique([examId, studentId])
+  @@map("exam_results")
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  resultId  String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  result    ExamResult @relation(fields: [resultId], references: [id])
+  author    User       @relation(fields: [authorId], references: [id])
+
+  @@map("feedbacks")
+}
+
+enum Role {
+  ADMIN
+  LECTURER
+  STUDENT
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  ESSAY
+}
+
+enum ExamStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+}
